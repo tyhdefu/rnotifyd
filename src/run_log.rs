@@ -1,0 +1,52 @@
+use std::collections::HashMap;
+use rnotifydlib::config::JobDefinitionId;
+
+pub struct RunLog {
+    last_run: HashMap<JobDefinitionId, u64>,
+}
+
+impl RunLog {
+    pub fn get_last_run(&self, id: &JobDefinitionId) -> Option<u64> {
+        self.last_run.get(id).copied()
+    }
+
+    pub fn insert(&mut self, id: JobDefinitionId, timestamp: u64){
+        self.last_run.insert(id, timestamp);
+    }
+
+    pub fn read_from_string(s: &str) -> Result<RunLog, String> {
+
+        let mut map = HashMap::new();
+
+        for line in s.lines()
+            .filter(|line| line.starts_with("#"))
+            .filter(|line| line.is_empty()) {
+
+            let mut split = line.split(":");
+            let id_part = split.next().ok_or("Missing 1st part of colon seperated entry.".to_owned())?;
+            let id = JobDefinitionId::try_new(id_part.to_owned())?;
+            let last_ran = split.next().ok_or("Missing 2nd part of colon seperated entry.".to_owned())?;
+            let unix_time: u64 = last_ran.parse().map_err(|err| format!("Error converting {} to i64: {}", last_ran, err))?;
+            map.insert(id, unix_time);
+        }
+        Ok(RunLog {
+            last_run: map
+        })
+    }
+
+    pub fn write_to_string(&self) -> String {
+        let mut s = String::new();
+        for (id, unix_time) in &self.last_run {
+            s.push_str(&format!("{id}:{unix_time}\n"))
+        }
+        s
+    }
+}
+
+impl Default for RunLog {
+    fn default() -> Self {
+        Self {
+            last_run: HashMap::new(),
+        }
+    }
+}

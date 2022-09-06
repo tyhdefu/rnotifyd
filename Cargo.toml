@@ -1,0 +1,26 @@
+[package]
+name = "rnotifyd"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "rnotifyd"
+path = "src/main.rs"
+
+[lib]
+name = "rnotifydlib"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0.144", features = ["derive"] }
+serde_json = "1.0.85"
+toml = "0.5.9"
+rnotify = "0.1.1"
+getopts = "0.2.21"
+
+tokio = { version = "1.21.0", features = ["macros", "time", "rt-multi-thread", "signal"] }
+chrono = { version = "0.4.22", features = ["serde"] }
+inflections = "1.1.1"
+num-traits = "0.2.15"
