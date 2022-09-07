@@ -37,22 +37,40 @@ impl NotifyDefinition {
 #[serde(tag = "type")]
 pub enum MessageGenerator {
     FromOutputBasic,
+    FromOutputIfFailed,
 }
 
 impl MessageGenerator {
     pub fn generate(&self, output: ProgramOutput) -> Option<MessageDetail> {
-        // TODO: Check if program errored.
-
-        let raw = format!("{:?}", output);
-        let mut components = vec![];
-        components.push(FormattedMessageComponent::Text(vec![FormattedString::new(format!("Failed with non-zero exit code {:?}", output.get_exit_status()), vec![])]));
-
-        let std_err = FormattedMessageComponent::Section("Stderr".to_owned(), vec![FormattedString::new(output.get_stderr().to_owned(), vec![Style::Monospace])]);
-        let std_out = FormattedMessageComponent::Section("Stdout".to_owned(), vec![FormattedString::new(output.get_stdout().to_owned(), vec![Style::Monospace])]);
-
-        components.push(std_err);
-        components.push(std_out);
-
-        Some(MessageDetail::Formatted(FormattedMessageDetail::new(raw, components)))
+        return match &self {
+            MessageGenerator::FromOutputBasic => Some(from_output(output)),
+            MessageGenerator::FromOutputIfFailed => {
+                if !output.get_exit_status().success() {
+                    return Some(from_output(output));
+                }
+                return None;
+            }
+        }
     }
+}
+
+fn from_output(output: ProgramOutput) -> MessageDetail {
+    let raw = format!("{:?}", output);
+    let mut components = vec![];
+    let exit_code = output.get_exit_status().code();
+    let exit_code_str = match exit_code {
+        None => "unknown exit code".to_owned(),
+        Some(v) => format!("exit code {:?}", v),
+    };
+    let success = output.get_exit_status().success();
+    let topline = format!("Program {} with {}", if success {"successful"} else {"failed"}, exit_code_str);
+    components.push(FormattedMessageComponent::Text(vec![FormattedString::plain(topline)]));
+
+    let std_err = FormattedMessageComponent::Section("Stderr".to_owned(), vec![FormattedString::new(output.get_stderr().to_owned(), vec![Style::Monospace])]);
+    let std_out = FormattedMessageComponent::Section("Stdout".to_owned(), vec![FormattedString::new(output.get_stdout().to_owned(), vec![Style::Monospace])]);
+
+    components.push(std_err);
+    components.push(std_out);
+
+    MessageDetail::Formatted(FormattedMessageDetail::new(raw, components))
 }

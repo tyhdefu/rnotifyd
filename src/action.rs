@@ -10,9 +10,9 @@ pub enum Action {
     /// Runs a program. If it fails, pipe the output to rnotify.
     Program{ program: String, args: Vec<String> },
     /// Checks if a systemd service is running on the current machine
-    SystemdActiveLocal(String),
+    SystemdActiveLocal { service: String },
     /// Checks if a device responds to a ping.
-    Ping(IpAddr),
+    Ping{ ip: String },
 }
 
 impl Action {
@@ -40,12 +40,13 @@ impl Action {
                 cmd.args(args);
                 run_program(cmd)
             }
-            Action::SystemdActiveLocal(_) => {
+            Action::SystemdActiveLocal{ service } => {
                 let mut cmd = Command::new("systemctl");
                 cmd.arg("is-active");
+                cmd.arg(service);
                 run_program(cmd)
             }
-            Action::Ping(ip) => {
+            Action::Ping { ip } => {
                 let mut cmd = Command::new("ping");
                 cmd.arg(ip.to_string());
                 run_program(cmd)
