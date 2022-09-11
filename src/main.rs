@@ -22,7 +22,6 @@ mod run_log;
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
-    console_subscriber::init();
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
     opts.optopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.json file.", "RNOTIFYD");

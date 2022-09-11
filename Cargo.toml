@@ -25,5 +25,3 @@ chrono = { version = "0.4.22", features = ["serde"] }
 inflections = "1.1.1"
 num-traits = "0.2.15"
 surge-ping = "0.7.2"
-
-console-subscriber = "0.1.7"
