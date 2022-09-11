@@ -60,7 +60,6 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
     }
 
     loop {
-        println!("Hi");
         let now = Local::now();
         let timestamp_now = now.timestamp() as u64;
         for (id, definition) in job_config.entries() {
@@ -76,7 +75,6 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
             }
         }
         let short_wait = next_run.values().map(|i| i - timestamp_now).min().unwrap_or(u64::MAX);
-        println!("Min wait: {}", short_wait);
         let short_wait_duration = Duration::from_secs(short_wait);
         let sleep = min(short_wait_duration, CHECK_INTERVAL);
         match tokio::time::timeout(sleep, tokio::signal::ctrl_c()).await {
