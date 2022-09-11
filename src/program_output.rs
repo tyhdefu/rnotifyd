@@ -30,7 +30,7 @@ impl ProgramOutput {
                 .min();
 
             if let Some(chop_start) = chop_start {
-                *s = format!("...{}", s[chop_start..]);
+                *s = format!("...{}", &s[chop_start..]);
             }
         }
     }
