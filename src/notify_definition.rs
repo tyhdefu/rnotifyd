@@ -41,7 +41,8 @@ pub enum MessageGenerator {
 }
 
 impl MessageGenerator {
-    pub fn generate(&self, output: ProgramOutput) -> Option<MessageDetail> {
+    pub fn generate(&self, mut output: ProgramOutput) -> Option<MessageDetail> {
+        output.trim_to(500);
         return match &self {
             MessageGenerator::FromOutputBasic => Some(from_output(output)),
             MessageGenerator::FromOutputIfFailed => {

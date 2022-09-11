@@ -14,6 +14,27 @@ impl ProgramOutput {
         }
     }
 
+    pub fn trim_to(&mut self, max_len: usize) {
+        Self::trim_string(&mut self.std_out, max_len);
+        Self::trim_string(&mut self.std_err, max_len);
+    }
+
+    fn trim_string(s: &mut String, max_len: usize) {
+        let len = s.len();
+        if len > max_len {
+            let hope_to_chop_at_start = len - max_len;
+
+            let chop_start = s.char_indices()
+                .map(|(i, _c)| i)
+                .filter(|i| i > &hope_to_chop_at_start)
+                .min();
+
+            if let Some(chop_start) = chop_start {
+                *s = s[chop_start..].to_owned();
+            }
+        }
+    }
+
 
     pub fn get_stdout(&self) -> &str {
         &self.std_out
