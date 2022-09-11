@@ -1,18 +1,16 @@
-use std::process::ExitStatus;
-
 #[derive(Debug)]
 pub struct ProgramOutput {
     std_out: String,
     std_err: String,
-    exit_status: ExitStatus,
+    exit_code: i32,
 }
 
 impl ProgramOutput {
-    pub fn new(std_out: String, std_err: String, exit_status: ExitStatus) -> Self {
+    pub fn new(std_out: String, std_err: String, exit_code: i32) -> Self {
         Self {
             std_out,
             std_err,
-            exit_status,
+            exit_code
         }
     }
 
@@ -25,7 +23,7 @@ impl ProgramOutput {
         &self.std_err
     }
 
-    pub fn get_exit_status(&self) -> &ExitStatus {
-        &self.exit_status
+    pub fn get_exit_code(&self) -> i32 {
+        self.exit_code
     }
 }

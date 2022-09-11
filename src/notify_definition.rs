@@ -45,7 +45,7 @@ impl MessageGenerator {
         return match &self {
             MessageGenerator::FromOutputBasic => Some(from_output(output)),
             MessageGenerator::FromOutputIfFailed => {
-                if !output.get_exit_status().success() {
+                if output.get_exit_code() != 0 {
                     return Some(from_output(output));
                 }
                 return None;
@@ -57,12 +57,9 @@ impl MessageGenerator {
 fn from_output(output: ProgramOutput) -> MessageDetail {
     let raw = format!("{:?}", output);
     let mut components = vec![];
-    let exit_code = output.get_exit_status().code();
-    let exit_code_str = match exit_code {
-        None => "unknown exit code".to_owned(),
-        Some(v) => format!("exit code {:?}", v),
-    };
-    let success = output.get_exit_status().success();
+
+    let exit_code_str = format!("exit code {:?}", output.get_exit_code());
+    let success = output.get_exit_code() == 0;
     let topline = format!("Program {} with {}", if success {"successful"} else {"failed"}, exit_code_str);
     components.push(FormattedMessageComponent::Text(vec![FormattedString::plain(topline)]));
 

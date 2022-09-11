@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -19,8 +20,9 @@ const CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
 mod run_log;
 
-#[tokio::main]
+#[tokio::main(worker_threads = 3)]
 async fn main() {
+    console_subscriber::init();
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
     opts.optopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.json file.", "RNOTIFYD");
@@ -34,6 +36,7 @@ async fn main() {
 
     let run_log = read_run_log(&configs.run_log);
     main_loop(configs, run_log).await;
+    println!("Done.");
 }
 
 async fn main_loop(config: AllConfig, mut run_log: RunLog) {
@@ -58,6 +61,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
     }
 
     loop {
+        println!("Hi");
         let now = Local::now();
         let timestamp_now = now.timestamp() as u64;
         for (id, definition) in job_config.entries() {
@@ -72,40 +76,35 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 update_next_run(&mut next_run, now + chrono::Duration::seconds(1), id, definition, &run_log);
             }
         }
-        let min_wait = next_run.values().map(|i| i - timestamp_now).min().unwrap_or(u64::MAX);
-        println!("Min wait: {}", min_wait);
-        let min_wait_duration = Duration::from_secs(min_wait);
-        let quick_sleep = tokio::time::sleep(min_wait_duration);
-        tokio::pin!(quick_sleep);
-        select!(
-            _ = tokio::signal::ctrl_c() => {
-                eprintln!("Received control-c");
-                break;
+        let short_wait = next_run.values().map(|i| i - timestamp_now).min().unwrap_or(u64::MAX);
+        println!("Min wait: {}", short_wait);
+        let short_wait_duration = Duration::from_secs(short_wait);
+        let sleep = min(short_wait_duration, CHECK_INTERVAL);
+        match tokio::time::timeout(sleep, tokio::signal::ctrl_c()).await {
+            Ok(_) => {
+                println!("Received control-c");
+                return;
             }
-            _ = interval.tick() => {
-                println!("Tick: {}", Local::now());
+            Err(_) => {
+                println!("Finished wait.");
             }
-            _ = quick_sleep, if min_wait_duration < CHECK_INTERVAL => {
-                println!("Quick tick.");
-            }
-        );
+        }
     }
 }
 
 fn spawn_job(id: JobDefinitionId, action: Action, notify_definition: NotifyDefinition, rnotify_config: rnotifylib::config::Config) {
-    tokio::task::spawn_blocking(move || {
+    tokio::task::spawn( async move {
         println!("Running job: {} at {}", id, Local::now());
-        let output = action.execute();
+        let output = action.execute().await;
         if let Err(err) = output {
-            eprintln!("Failed to run job: {}", err);
+            eprintln!("Failed to run job [{}]: {}", id, err);
             return;
         }
         let output = output.unwrap();
-        println!("Job {} returned exit code {:?}", id, output.get_exit_status());
+        println!("Job {} returned exit code {:?}", id, output.get_exit_code());
         match notify_definition.create_message(&id, output) {
             None => println!("Job {} ran and didn't need a rnotify message to be sent about it.", id),
             Some(message) => {
-                println!();
                 match rnotifylib::send_message(message, &rnotify_config) {
                     Ok(()) => println!("Job {} ran, and successfully sent a message to rnotify.", id),
                     Err(errs) => println!("Job {} ran, but failed to send a message to rnotify {}", id, errs),
