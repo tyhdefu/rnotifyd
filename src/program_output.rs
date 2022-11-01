@@ -1,3 +1,8 @@
+use rnotifylib::message::formatted_detail::{FormattedString, Style};
+use rnotifylib::message::message_detail_builder::MessageDetailBuilder;
+use rnotifylib::message::MessageDetail;
+use crate::action::ProgramOutputFormat;
+
 #[derive(Debug)]
 pub struct ProgramOutput {
     std_out: String,
@@ -47,4 +52,46 @@ impl ProgramOutput {
     pub fn get_exit_code(&self) -> i32 {
         self.exit_code
     }
+
+    pub fn is_success(&self) -> bool {
+        self.exit_code == 0
+    }
+
+    pub fn to_detail(mut self, format: &ProgramOutputFormat) -> MessageDetail {
+        self.trim_to(500);
+        let suc = self.is_success();
+        match (format, suc) {
+            (ProgramOutputFormat::SimpleIfSuccess, true) => MessageDetail::Raw("Program Succeeded".to_owned()),
+            (ProgramOutputFormat::SimpleIfSuccess, false) => to_detail_verbose(&self),
+
+            (ProgramOutputFormat::StdoutIfSuccess, true) => {
+                MessageDetailBuilder::new()
+                    .text(vec![FormattedString::plain("Program Succeeded")])
+                    .section("Stdout", |section| {
+                        section.append_styled(self.std_out, Style::Monospace);
+                    })
+                    .build()
+            },
+            (ProgramOutputFormat::StdoutIfSuccess, false) => to_detail_verbose(&self),
+            (ProgramOutputFormat::AlwaysDetailed, _) => to_detail_verbose(&self),
+        }
+    }
+}
+
+fn to_detail_verbose(output: &ProgramOutput) -> MessageDetail {
+    let success = output.is_success();
+    let raw = format!("{:?}", output); // TODO: add raw to message detail
+
+    let exit_code_str = format!("exit code {:?}", output.get_exit_code());
+    let topline = format!("Program {} with {}", if success {"successful"} else {"failed"}, exit_code_str);
+
+    MessageDetailBuilder::new()
+        .text(vec![FormattedString::plain(topline)])
+        .section("Stderr", |section| {
+            section.append_styled(output.get_stderr(), Style::Monospace);
+        })
+        .section("Stdout", |section| {
+            section.append_styled(output.get_stdout(), Style::Monospace);
+        })
+        .build()
 }

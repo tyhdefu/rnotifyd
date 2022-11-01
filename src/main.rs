@@ -3,12 +3,12 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, SecondsFormat};
 use getopts::{Matches, Options};
-use tokio::select;
 use tokio::time::MissedTickBehavior;
 use rnotifydlib::action::Action;
 use rnotifydlib::config::{JobDefinition, JobDefinitionId};
+use rnotifydlib::job_result::JobResult;
 use rnotifydlib::notify_definition::NotifyDefinition;
 use crate::run_log::RunLog;
 
@@ -54,7 +54,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 
             let last_run = run_log.get_last_run(id);
             let next = definition.get_frequency().next(&now, last_run);
-            println!("Next {}, now: {}, diff: {}", next, timestamp_now, next - timestamp_now);
+            //println!("Next {}, now: {}, diff: {}", next, timestamp_now, next - timestamp_now);
             next
         })
     }
@@ -83,7 +83,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 return;
             }
             Err(_) => {
-                println!("Finished wait.");
+                //println!("Finished wait.");
             }
         }
     }
@@ -91,20 +91,18 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 
 fn spawn_job(id: JobDefinitionId, action: Action, notify_definition: NotifyDefinition, rnotify_config: rnotifylib::config::Config) {
     tokio::task::spawn( async move {
-        println!("Running job: {} at {}", id, Local::now());
+        println!("[{id}] Running at {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
         let output = action.execute().await;
-        if let Err(err) = output {
-            eprintln!("Failed to run job [{}]: {}", id, err);
-            return;
+        if let JobResult::Invalid(err) = &output {
+            eprintln!("[{id}] Failed to run job: {:?}", err);
         }
-        let output = output.unwrap();
-        println!("Job {} returned exit code {:?}", id, output.get_exit_code());
+        println!("[{id}] Job had outcome {}", output.type_str());
         match notify_definition.create_message(&id, output) {
-            None => println!("Job {} ran and didn't need a rnotify message to be sent about it.", id),
+            None => println!("[{id}] Didn't need a rnotify message to be sent"),
             Some(message) => {
                 match rnotifylib::send_message(message, &rnotify_config) {
-                    Ok(()) => println!("Job {} ran, and successfully sent a message to rnotify.", id),
-                    Err(errs) => println!("Job {} ran, but failed to send a message to rnotify {}", id, errs),
+                    Ok(()) => println!("[{id}] Sent a message to rnotify."),
+                    Err(errs) => println!("[{id}] Failed to send a message to rnotify {}", errs),
                 }
             }
         }

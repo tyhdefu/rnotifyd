@@ -1,74 +1,39 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use rnotifylib::message::author::Author;
 use rnotifylib::message::component::Component;
-use rnotifylib::message::{Level, Message, MessageDetail};
-use rnotifylib::message::formatted_detail::{FormattedMessageComponent, FormattedMessageDetail, FormattedString, Style};
+use rnotifylib::message::{Level, Message};
 use crate::config::JobDefinitionId;
 use serde::{Serialize, Deserialize};
-use crate::program_output::ProgramOutput;
+use crate::job_result::JobResult;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct NotifyDefinition {
     title: String,
     component: Component,
-    level: Level,
-    message_generator: MessageGenerator,
+    report_if_success: bool,
 }
 
 impl NotifyDefinition {
-    pub fn create_message(&self, job_id: &JobDefinitionId, output: ProgramOutput) -> Option<Message> {
+    pub fn create_message(&self, job_id: &JobDefinitionId, job_result: JobResult) -> Option<Message> {
         let author = Author::parse(format!("rnotifyd/{}", job_id));
         let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
             .expect("Failed to get duration since unix epoch")
             .as_millis();
 
-        let detail = self.message_generator.generate(output);
-        if detail.is_none() {
-            return None;
-        }
-
-        Some(Message::new(self.level.clone(), Some(self.title.clone()), detail.unwrap(),
-                     Some(self.component.clone()), author,
-                     unix_timestamp as i64))
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum MessageGenerator {
-    FromOutputBasic,
-    FromOutputIfFailed,
-}
-
-impl MessageGenerator {
-    pub fn generate(&self, mut output: ProgramOutput) -> Option<MessageDetail> {
-        output.trim_to(500);
-        return match &self {
-            MessageGenerator::FromOutputBasic => Some(from_output(output)),
-            MessageGenerator::FromOutputIfFailed => {
-                if output.get_exit_code() != 0 {
-                    return Some(from_output(output));
-                }
+        if let JobResult::Ok(_) = job_result {
+            if !self.report_if_success {
                 return None;
             }
         }
+
+        let level = match job_result {
+            JobResult::Ok(_) => Level::Info,
+            JobResult::Invalid(_) => Level::SelfError,
+            JobResult::Failed(_) => Level::Error,
+        };
+
+        Some(Message::new(level, Some(self.title.clone()), job_result.take_detail(),
+                     Some(self.component.clone()), author,
+                     unix_timestamp as i64))
     }
-}
-
-fn from_output(output: ProgramOutput) -> MessageDetail {
-    let raw = format!("{:?}", output);
-    let mut components = vec![];
-
-    let exit_code_str = format!("exit code {:?}", output.get_exit_code());
-    let success = output.get_exit_code() == 0;
-    let topline = format!("Program {} with {}", if success {"successful"} else {"failed"}, exit_code_str);
-    components.push(FormattedMessageComponent::Text(vec![FormattedString::plain(topline)]));
-
-    let std_err = FormattedMessageComponent::Section("Stderr".to_owned(), vec![FormattedString::new(output.get_stderr().to_owned(), vec![Style::Monospace])]);
-    let std_out = FormattedMessageComponent::Section("Stdout".to_owned(), vec![FormattedString::new(output.get_stdout().to_owned(), vec![Style::Monospace])]);
-
-    components.push(std_err);
-    components.push(std_out);
-
-    MessageDetail::Formatted(FormattedMessageDetail::new(raw, components))
 }
