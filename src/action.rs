@@ -99,15 +99,13 @@ fn run_program(mut cmd: Command) -> Result<ProgramOutput, Box<dyn Error>> {
     cmd.stderr(Stdio::piped());
 
     let mut process = cmd.spawn()?;
-    let status = process.wait()?;
 
-    let mut std_out = String::new();
-    process.stdout.take().unwrap().read_to_string(&mut std_out)?;
+    let output = process.wait_with_output()?;
 
-    let mut std_err = String::new();
-    process.stderr.take().unwrap().read_to_string(&mut std_err)?;
+    let std_out = String::from_utf8_lossy(&output.stdout);
+    let std_err = String::from_utf8_lossy(&output.stdout);
 
-    Ok(ProgramOutput::new(std_out, std_err, status.code().unwrap_or(-1)))
+    Ok(ProgramOutput::new(std_out.into(), std_err.into(), status.status.code().unwrap_or(-1)))
 }
 
 #[derive(Debug)]
