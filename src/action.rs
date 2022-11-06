@@ -3,10 +3,9 @@ use std::fmt::{Debug, Display, Formatter};
 use std::io::Read;
 use std::net::IpAddr;
 use std::process::{Command, Stdio};
-use std::time::Duration;
 use rnotifylib::message::MessageDetail;
 use serde::{Serialize, Deserialize};
-use surge_ping::{IcmpPacket, SurgeError};
+use surge_ping::SurgeError;
 use crate::job_result::JobResult;
 use crate::program_output::ProgramOutput;
 
@@ -14,11 +13,19 @@ use crate::program_output::ProgramOutput;
 #[serde(tag = "type")]
 pub enum Action {
     /// Runs a program. If it fails, pipe the output to rnotify.
-    Program{ program: String, args: Vec<String>, output_format: ProgramOutputFormat },
+    Program(ProgramAction),
     /// Checks if a systemd service is running on the current machine
     SystemdActiveLocal { service: String },
     /// Checks if a device responds to a ping.
     Ping{ host: String },
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ProgramAction {
+    program: String,
+    args: Vec<String>,
+    #[serde(default)]
+    output_format: ProgramOutputFormat
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -37,20 +44,20 @@ impl Default for ProgramOutputFormat {
 impl Action {
     pub async fn execute(&self) -> JobResult {
         return match &self {
-            Action::Program{ program, args, output_format } => {
-                let mut cmd = Command::new(program);
-                cmd.args(args);
+            Action::Program(action) => {
+                let mut cmd = Command::new(&action.program);
+                cmd.args(&action.args);
                 match run_program(cmd) {
                     Ok(mut output) => {
                         let success = output.is_success();
                         output.trim_to(500);
-                        let detail = output.to_detail(output_format);
+                        let detail = output.to_detail(&action.output_format);
                         match success {
                             true => JobResult::Ok(detail),
                             false => JobResult::Failed(detail),
                         }
                     },
-                    Err(e) => JobResult::Invalid(MessageDetail::Raw(format!("Program: '{program}' with args '{args:?}'\nError: {e}")))
+                    Err(e) => JobResult::Invalid(MessageDetail::Raw(format!("Program: {}' with args '{:?}'\nError: {e}", &action.program, &action.args)))
                 }
             }
             Action::SystemdActiveLocal{ service } => {
