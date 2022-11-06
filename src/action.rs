@@ -105,7 +105,7 @@ fn run_program(mut cmd: Command) -> Result<ProgramOutput, Box<dyn Error>> {
     let std_out = String::from_utf8_lossy(&output.stdout);
     let std_err = String::from_utf8_lossy(&output.stdout);
 
-    Ok(ProgramOutput::new(std_out.into(), std_err.into(), status.status.code().unwrap_or(-1)))
+    Ok(ProgramOutput::new(std_out.into(), std_err.into(), output.status.code().unwrap_or(-1)))
 }
 
 #[derive(Debug)]
