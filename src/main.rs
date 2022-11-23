@@ -1,6 +1,7 @@
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fs;
+use std::fs::File;
 use std::path::PathBuf;
 use std::time::Duration;
 use chrono::{DateTime, Local, SecondsFormat};
@@ -24,8 +25,8 @@ mod run_log;
 async fn main() {
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
-    opts.optopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.json file.", "RNOTIFYD");
-    opts.optopt("", RNOTIFY_RUN_LOG_ARG, "The run log file.", "RNOTIFYD RUNLOG");
+    opts.reqopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.json file.", "RNOTIFYD");
+    opts.optopt("", RNOTIFY_RUN_LOG_ARG, "The run log file.", "RUNLOG");
     let args: Vec<_> = std::env::args().collect();
     let parsed = match opts.parse(args) {
         Ok(matches) => matches,
@@ -48,7 +49,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 
     fn update_next_run(next_run: &mut HashMap<JobDefinitionId, u64>, now: DateTime<Local>,
                        id: &JobDefinitionId, definition: &JobDefinition,
-                        run_log: &RunLog) -> u64 {
+                       run_log: &RunLog) -> u64 {
         *next_run.entry(id.clone()).or_insert_with(|| {
             let timestamp_now = now.timestamp() as u64;
 
@@ -63,7 +64,6 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
         let now = Local::now();
         let timestamp_now = now.timestamp() as u64;
         for (id, definition) in job_config.entries() {
-
             let next = update_next_run(&mut next_run, now, id, definition, &run_log);
             if timestamp_now >= next {
                 next_run.remove(id);
@@ -90,7 +90,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 }
 
 fn spawn_job(id: JobDefinitionId, action: Action, notify_definition: NotifyDefinition, rnotify_config: rnotifylib::config::Config) {
-    tokio::task::spawn( async move {
+    tokio::task::spawn(async move {
         println!("[{id}] Running at {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
         let output = action.execute().await;
         if let JobResult::Invalid(err) = &output {
@@ -118,9 +118,15 @@ fn get_string_arg(matches: &Matches, arg_name: &str) -> String {
 }
 
 fn read_configs(parsed: &Matches) -> AllConfig {
-    let rnotify_config_path = get_string_arg(parsed, RNOTIFY_CONFIG_ARG);
+    let rnotify_config_path = parsed.opt_str(RNOTIFY_CONFIG_ARG)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| rnotifylib::config::get_default_config_path());
+
     let rnotifyd_config_path = get_string_arg(parsed, RNOTIFYD_CONFIG_ARG);
-    let rnotify_storage_path = get_string_arg(parsed, RNOTIFY_RUN_LOG_ARG);
+
+    let rnotify_storage_path = parsed.opt_str(RNOTIFY_RUN_LOG_ARG)
+        .unwrap_or_else(|| String::from("run_log.txt"));
+
 
     let run_log: PathBuf = rnotify_storage_path.into();
 
@@ -167,7 +173,7 @@ fn read_run_log(path: &PathBuf) -> RunLog {
     RunLog::read_from_string(&run_log_str).expect("Failed to parse run log.")
 }
 
-fn write_run_log(run_log: &RunLog, path: &PathBuf) -> std::io::Result<()>{
+fn write_run_log(run_log: &RunLog, path: &PathBuf) -> std::io::Result<()> {
     let s = run_log.write_to_string();
     fs::write(path, s)
 }
