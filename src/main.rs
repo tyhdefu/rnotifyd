@@ -148,11 +148,11 @@ fn read_configs(parsed: &Matches) -> AllConfig {
         }
         let rnotifyd_config_str = match fs::read_to_string(path) {
             Ok(s) => s,
-            Err(err) => panic!("Error reading rnotifyd (json) config file {}", err),
+            Err(err) => panic!("Error reading rnotifyd (yaml) config file {}", err),
         };
-        match serde_json::from_str(&rnotifyd_config_str) {
+        match serde_yaml::from_str(&rnotifyd_config_str) {
             Ok(c) => c,
-            Err(err) => panic!("Error parsing rnotifyd (json) config file: {}", err),
+            Err(err) => panic!("Error parsing rnotifyd (yaml) config file: {}", err),
         }
     };
 

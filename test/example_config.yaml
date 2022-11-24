@@ -1,0 +1,16 @@
+jobs:
+  check-devices:
+    action:
+      type: "Program"
+      program: "ping"
+      args: ["192.168.0.10"]
+      output_format: "StdoutIfSuccess"
+    frequency:
+      type: "FixedPeriod"
+      hours: 0
+      minutes: 30
+      seconds: 0
+    notify_definition:
+      title: "Ping 192.168.0.10"
+      component: "ping"
+      report_if_success: false

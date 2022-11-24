@@ -6,7 +6,7 @@ use crate::config::JobDefinitionId;
 use serde::{Serialize, Deserialize};
 use crate::job_result::JobResult;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct NotifyDefinition {
     title: String,
     component: Component,
@@ -14,6 +14,14 @@ pub struct NotifyDefinition {
 }
 
 impl NotifyDefinition {
+    pub fn new(title: String, component: Component, report_if_success: bool) -> Self {
+        Self {
+            title,
+            component,
+            report_if_success,
+        }
+    }
+
     pub fn create_message(&self, job_id: &JobDefinitionId, job_result: JobResult) -> Option<Message> {
         let author = Author::parse(format!("rnotifyd/{}", job_id));
         let unix_timestamp = SystemTime::now().duration_since(UNIX_EPOCH)

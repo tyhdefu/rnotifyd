@@ -5,7 +5,7 @@ use num_traits::cast::FromPrimitive;
 #[cfg(test)]
 mod test;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum Frequency {
     Daily { time: NaiveTime },
@@ -125,7 +125,7 @@ impl Frequency {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct FixedPeriodInner {
     hours: u32,
@@ -134,6 +134,14 @@ pub struct FixedPeriodInner {
 }
 
 impl FixedPeriodInner {
+    pub fn new(hours: u32, minutes: u32, seconds: u64) -> Self {
+        Self {
+            hours,
+            minutes,
+            seconds,
+        }
+    }
+
     pub fn as_seconds(&self) -> u64 {
         let mut seconds = (self.hours as u64) * 60 * 60;
         seconds += self.minutes as u64 * 60;

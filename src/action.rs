@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use std::io::Read;
 use std::net::IpAddr;
 use std::process::{Command, Stdio};
 use rnotifylib::message::MessageDetail;
@@ -9,7 +8,7 @@ use surge_ping::SurgeError;
 use crate::job_result::JobResult;
 use crate::program_output::ProgramOutput;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(tag = "type")]
 pub enum Action {
     /// Runs a program. If it fails, pipe the output to rnotify.
@@ -20,7 +19,7 @@ pub enum Action {
     Ping{ host: String },
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ProgramAction {
     program: String,
     args: Vec<String>,
@@ -28,7 +27,17 @@ pub struct ProgramAction {
     output_format: ProgramOutputFormat
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+impl ProgramAction {
+    pub fn new(program: String, args: Vec<String>, output_format: ProgramOutputFormat) -> Self {
+        Self {
+            program,
+            args,
+            output_format
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum ProgramOutputFormat {
     SimpleIfSuccess,
     StdoutIfSuccess,
@@ -94,7 +103,21 @@ impl Action {
     }
 }
 
+/*#[cfg(not(target_family = "linux"))]
+fn make_command(program: &str) -> Command {
+    Command::new(program)
+}
+
+#[cfg(target_family = "linux")]
+const RUN_FILE: &str = "/etc/rnotifyd/run.sh";
+
+#[cfg(target_family = "linux")]
+fn make_command(program: &str) -> Command {
+    Command::new("source ")
+}*/
+
 fn run_program(mut cmd: Command) -> Result<ProgramOutput, Box<dyn Error>> {
+
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
