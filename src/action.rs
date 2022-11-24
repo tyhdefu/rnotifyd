@@ -59,7 +59,7 @@ fn make_command() -> Command {
     cmd
 }
 
-#[cfg(target_family = "linux")]
+#[cfg(target_family = "unix")]
 fn make_command() -> Command {
     let mut cmd = Command::new("/bin/sh");
     cmd.arg("-c");
