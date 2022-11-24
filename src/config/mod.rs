@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize, Deserializer};
-use crate::action::Action;
 use crate::frequency::Frequency;
 use crate::notify_definition::NotifyDefinition;
 
@@ -18,14 +17,15 @@ impl Config {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct JobDefinition {
-    action: Action,
+    cmd: String,
     frequency: Frequency,
+    #[serde(rename = "notification")]
     notify_definition: NotifyDefinition,
 }
 
 impl JobDefinition {
-    pub fn get_action(&self) -> &Action {
-        &self.action
+    pub fn get_cmd(&self) -> &String {
+        &self.cmd
     }
 
     pub fn get_frequency(&self) -> &Frequency {
@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for JobDefinitionId {
 mod tests {
     use std::collections::HashMap;
     use rnotifylib::message::component::Component;
-    use crate::action::{Action, ProgramOutputFormat};
+    use crate::action::ProgramOutputFormat;
     use crate::config::{Config, JobDefinition, JobDefinitionId};
     use crate::frequency::{FixedPeriodInner, Frequency};
     use crate::notify_definition::NotifyDefinition;
@@ -83,9 +83,10 @@ mod tests {
 
         let mut jobs = HashMap::new();
         let job = JobDefinition {
-            action: Action::new("ping 192.168.0.10".to_string(), ProgramOutputFormat::StdoutIfSuccess),
+            cmd: "ping 192.168.0.10".to_string(),
             frequency: Frequency::FixedPeriod(FixedPeriodInner::new(0, 30, 0)),
-            notify_definition: NotifyDefinition::new("Ping 192.168.0.10".to_string(), Component::from("ping"), false),
+            notify_definition: NotifyDefinition::new("Ping 192.168.0.10".to_string(), Component::from("ping"),
+                                                     false, ProgramOutputFormat::StdoutIfSuccess),
         };
         jobs.insert(JobDefinitionId::try_new("check-devices".to_string()).unwrap(), job);
         let expected = Config { jobs };

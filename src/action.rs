@@ -1,19 +1,10 @@
 use std::error::Error;
-use std::fmt::{Debug, Display, Formatter};
-use std::net::IpAddr;
+use std::fmt::Debug;
 use std::process::{Command, Stdio};
 use rnotifylib::message::MessageDetail;
 use serde::{Serialize, Deserialize};
-use surge_ping::SurgeError;
 use crate::job_result::JobResult;
 use crate::program_output::ProgramOutput;
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Action {
-    cmd: String,
-    #[serde(default)]
-    output_format: ProgramOutputFormat
-}
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum ProgramOutputFormat {
@@ -28,27 +19,18 @@ impl Default for ProgramOutputFormat {
     }
 }
 
-impl Action {
-    pub fn new(cmd: String, output_format: ProgramOutputFormat) -> Self {
-        Self {
-            cmd,
-            output_format
-        }
-    }
-
-    pub async fn execute(&self) -> JobResult {
-        match run_program(&self.cmd) {
-            Ok(mut output) => {
-                let success = output.is_success();
-                output.trim_to(500);
-                let detail = output.to_detail(&self.output_format);
-                match success {
-                    true => JobResult::Ok(detail),
-                    false => JobResult::Failed(detail),
-                }
-            },
-            Err(e) => JobResult::Invalid(MessageDetail::Raw(format!("Failed to run command: '{}'\nError: {e}", &self.cmd)))
-        }
+pub async fn execute(cmd: &str, format: &ProgramOutputFormat) -> JobResult {
+    match run_program(cmd) {
+        Ok(mut output) => {
+            let success = output.is_success();
+            output.trim_to(500);
+            let detail = output.to_detail(format);
+            match success {
+                true => JobResult::Ok(detail),
+                false => JobResult::Failed(detail),
+            }
+        },
+        Err(e) => JobResult::Invalid(MessageDetail::Raw(format!("Failed to run command: '{}'\nError: {e}", &cmd)))
     }
 }
 

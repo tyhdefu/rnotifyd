@@ -8,7 +8,7 @@ use std::time::Duration;
 use chrono::{DateTime, Local, SecondsFormat};
 use getopts::{Matches, Options};
 use tokio::time::MissedTickBehavior;
-use rnotifydlib::action::Action;
+use rnotifydlib::action;
 use rnotifydlib::config::{JobDefinition, JobDefinitionId};
 use rnotifydlib::job_result::JobResult;
 use rnotifydlib::notify_definition::NotifyDefinition;
@@ -70,7 +70,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 next_run.remove(id);
                 println!("Job {} is due to run.", id);
                 // Run task.
-                spawn_job(id.clone(), definition.get_action().clone(), definition.get_notify_definition().clone(), config.rnotify.clone());
+                spawn_job(id.clone(), definition.get_cmd().clone(), definition.get_notify_definition().clone(), config.rnotify.clone());
                 run_log.insert(id.clone(), timestamp_now);
                 update_next_run(&mut next_run, now + chrono::Duration::seconds(1), id, definition, &run_log);
             }
@@ -90,10 +90,11 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
     }
 }
 
-fn spawn_job(id: JobDefinitionId, action: Action, notify_definition: NotifyDefinition, rnotify_config: rnotifylib::config::Config) {
+fn spawn_job(id: JobDefinitionId, cmd: String, notify_definition: NotifyDefinition, rnotify_config: rnotifylib::config::Config) {
     tokio::task::spawn(async move {
         println!("[{id}] Running at {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
-        let output = action.execute().await;
+        ; // TODO: Make output format be fully contained in notify definition
+        let output = action::execute(&cmd, notify_definition.get_output_format()).await;
         if let JobResult::Invalid(err) = &output {
             eprintln!("[{id}] Failed to run job: {:?}", err);
         }
