@@ -1,9 +1,7 @@
 jobs:
   check-devices:
     action:
-      type: "Program"
-      program: "ping"
-      args: ["192.168.0.10"]
+      cmd: "ping 192.168.0.10"
       output_format: "StdoutIfSuccess"
     frequency:
       type: "FixedPeriod"

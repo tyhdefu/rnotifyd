@@ -9,32 +9,10 @@ use crate::job_result::JobResult;
 use crate::program_output::ProgramOutput;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-#[serde(tag = "type")]
-pub enum Action {
-    /// Runs a program. If it fails, pipe the output to rnotify.
-    Program(ProgramAction),
-    /// Checks if a systemd service is running on the current machine
-    SystemdActiveLocal { service: String },
-    /// Checks if a device responds to a ping.
-    Ping{ host: String },
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct ProgramAction {
-    program: String,
-    args: Vec<String>,
+pub struct Action {
+    cmd: String,
     #[serde(default)]
     output_format: ProgramOutputFormat
-}
-
-impl ProgramAction {
-    pub fn new(program: String, args: Vec<String>, output_format: ProgramOutputFormat) -> Self {
-        Self {
-            program,
-            args,
-            output_format
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
@@ -51,72 +29,46 @@ impl Default for ProgramOutputFormat {
 }
 
 impl Action {
+    pub fn new(cmd: String, output_format: ProgramOutputFormat) -> Self {
+        Self {
+            cmd,
+            output_format
+        }
+    }
+
     pub async fn execute(&self) -> JobResult {
-        return match &self {
-            Action::Program(action) => {
-                let mut cmd = Command::new(&action.program);
-                cmd.args(&action.args);
-                match run_program(cmd) {
-                    Ok(mut output) => {
-                        let success = output.is_success();
-                        output.trim_to(500);
-                        let detail = output.to_detail(&action.output_format);
-                        match success {
-                            true => JobResult::Ok(detail),
-                            false => JobResult::Failed(detail),
-                        }
-                    },
-                    Err(e) => JobResult::Invalid(MessageDetail::Raw(format!("Program: {}' with args '{:?}'\nError: {e}", &action.program, &action.args)))
+        match run_program(&self.cmd) {
+            Ok(mut output) => {
+                let success = output.is_success();
+                output.trim_to(500);
+                let detail = output.to_detail(&self.output_format);
+                match success {
+                    true => JobResult::Ok(detail),
+                    false => JobResult::Failed(detail),
                 }
-            }
-            Action::SystemdActiveLocal{ service } => {
-                let mut cmd = Command::new("systemctl");
-                cmd.arg("is-active");
-                cmd.arg(service);
-                match run_program(cmd) {
-                    Ok(output) => {
-                        match output.is_success() {
-                            true => JobResult::Ok(MessageDetail::Raw(format!("Systemd service {service} is running."))),
-                            false => JobResult::Failed(MessageDetail::Raw(format!("Systemd service {service} is not running"))),
-                        }
-                    },
-                    Err(err) => JobResult::Invalid(MessageDetail::Raw(format!("Failed to check whether systemd service is running: {err:?}")))
-                }
-            }
-            Action::Ping { host } => {
-                let ip: IpAddr = match host.parse() {
-                    Ok(ip) => ip,
-                    Err(err) => return JobResult::Invalid(MessageDetail::Raw(format!("Failed to parse host '{host}': {err:?}"))),
-                };
-                let payload = [0u8, 1, 2, 3, 4, 5, 6, 7];
-                match surge_ping::ping(ip, &payload).await {
-                    Ok((_, duration)) => JobResult::Ok(MessageDetail::Raw(format!("Host '{host}' responded to ping after {}ms", duration.as_millis()))),
-                    Err(err) => {
-                        match err {
-                            SurgeError::Timeout { .. } => JobResult::Failed(MessageDetail::Raw(format!("Pinging '{host}' timed out."))),
-                            error => JobResult::Invalid(MessageDetail::Raw(format!("Failed to ping host {host}: {error:?}")))
-                        }
-                    }
-                }
-            }
-        };
+            },
+            Err(e) => JobResult::Invalid(MessageDetail::Raw(format!("Failed to run command: '{}'\nError: {e}", &self.cmd)))
+        }
     }
 }
 
-/*#[cfg(not(target_family = "linux"))]
-fn make_command(program: &str) -> Command {
-    Command::new(program)
+#[cfg(target_family = "windows")]
+fn make_command() -> Command {
+    let mut cmd = Command::new("cmd");
+    cmd.arg("/C");
+    cmd
 }
 
 #[cfg(target_family = "linux")]
-const RUN_FILE: &str = "/etc/rnotifyd/run.sh";
+fn make_command() -> Command {
+    let mut cmd = Command::new("/bin/sh");
+    cmd.arg("-c");
+    cmd
+}
 
-#[cfg(target_family = "linux")]
-fn make_command(program: &str) -> Command {
-    Command::new("source ")
-}*/
-
-fn run_program(mut cmd: Command) -> Result<ProgramOutput, Box<dyn Error>> {
+fn run_program(job: &str) -> Result<ProgramOutput, Box<dyn Error>> {
+    let mut cmd = make_command();
+    cmd.arg(job);
 
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
@@ -129,25 +81,4 @@ fn run_program(mut cmd: Command) -> Result<ProgramOutput, Box<dyn Error>> {
     let std_err = String::from_utf8_lossy(&output.stdout);
 
     Ok(ProgramOutput::new(std_out.into(), std_err.into(), output.status.code().unwrap_or(-1)))
-}
-
-#[derive(Debug)]
-struct FailedToResolveHost {
-    host: String,
-}
-
-impl FailedToResolveHost {
-    pub fn new(host: String) -> Self {
-        Self {
-            host
-        }
-    }
-}
-
-impl Error for FailedToResolveHost {}
-
-impl Display for FailedToResolveHost {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Failed to resolve '{}' to an Ip.", self.host)
-    }
 }

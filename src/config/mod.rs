@@ -71,7 +71,7 @@ impl<'de> Deserialize<'de> for JobDefinitionId {
 mod tests {
     use std::collections::HashMap;
     use rnotifylib::message::component::Component;
-    use crate::action::{Action, ProgramAction, ProgramOutputFormat};
+    use crate::action::{Action, ProgramOutputFormat};
     use crate::config::{Config, JobDefinition, JobDefinitionId};
     use crate::frequency::{FixedPeriodInner, Frequency};
     use crate::notify_definition::NotifyDefinition;
@@ -83,9 +83,7 @@ mod tests {
 
         let mut jobs = HashMap::new();
         let job = JobDefinition {
-            action: Action::Program(ProgramAction::new("ping".to_string(),
-                                                       vec!["192.168.0.10".to_string()],
-                                                       ProgramOutputFormat::StdoutIfSuccess)),
+            action: Action::new("ping 192.168.0.10".to_string(), ProgramOutputFormat::StdoutIfSuccess),
             frequency: Frequency::FixedPeriod(FixedPeriodInner::new(0, 30, 0)),
             notify_definition: NotifyDefinition::new("Ping 192.168.0.10".to_string(), Component::from("ping"), false),
         };

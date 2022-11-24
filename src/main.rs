@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
 use std::path::PathBuf;
+use std::process::Command;
 use std::time::Duration;
 use chrono::{DateTime, Local, SecondsFormat};
 use getopts::{Matches, Options};
