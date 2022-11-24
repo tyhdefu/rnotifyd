@@ -89,7 +89,7 @@ mod tests {
             frequency: Frequency::FixedPeriod(FixedPeriodInner::new(0, 30, 0)),
             notify_definition: NotifyDefinition::new("Ping 192.168.0.10".to_string(), Component::from("ping"), false),
         };
-        jobs.insert(JobDefinitionId::try_new("check-device".to_string()).unwrap(), job);
+        jobs.insert(JobDefinitionId::try_new("check-devices".to_string()).unwrap(), job);
         let expected = Config { jobs };
 
         assert_eq!(expected, config);
