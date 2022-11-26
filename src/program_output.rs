@@ -80,12 +80,12 @@ impl ProgramOutput {
 
 fn to_detail_verbose(output: &ProgramOutput) -> MessageDetail {
     let success = output.is_success();
-    let raw = format!("{:?}", output); // TODO: add raw to message detail
+    let raw = format!("{:?}", output);
 
     let exit_code_str = format!("exit code {:?}", output.get_exit_code());
     let topline = format!("Program {} with {}", if success {"successful"} else {"failed"}, exit_code_str);
 
-    MessageDetailBuilder::new()
+    MessageDetailBuilder::with_raw(raw)
         .text(vec![FormattedString::plain(topline)])
         .section("Stderr", |section| {
             section.append_styled(output.get_stderr(), Style::Monospace);
