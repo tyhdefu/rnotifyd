@@ -31,6 +31,7 @@ async fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
         .enable_time()
+        .enable_io()
         .build()
         .unwrap();
 
@@ -48,9 +49,8 @@ async fn main() {
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
-    let handle = runtime.handle().clone();
-
-    main_loop(configs, run_log, runtime).await
+    main_loop(configs, run_log, runtime).await;
+    println!("-- Stopped at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true))
 }
 
 async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: Runtime) {
