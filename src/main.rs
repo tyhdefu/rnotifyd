@@ -1,16 +1,14 @@
 use std::cmp::min;
-use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::time::Duration;
-use chrono::{DateTime, Local, SecondsFormat};
+use chrono::{Local, SecondsFormat};
 use getopts::Options;
 use tokio::sync::mpsc::Sender;
 use tokio::time::MissedTickBehavior;
 use all_config::AllConfig;
 use next_run::NextRun;
 use rnotifydlib::action;
-use rnotifydlib::config::{JobDefinition, JobDefinitionId};
-use rnotifydlib::frequency::Frequency;
+use rnotifydlib::config::JobDefinitionId;
 use rnotifydlib::job_result::JobResult;
 use rnotifydlib::notify_definition::NotifyDefinition;
 use crate::run_log::RunLog;
@@ -91,7 +89,16 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 
             }
             _ = tokio::signal::ctrl_c() => {
-                println!("Received control-c");
+                eprintln!("Received control-c");
+                let s: String = running.get_running().iter()
+                    .filter(|(_a, b)| !b.is_empty())
+                    .map(|(a, b)| format!("{a} x{}", b.len()))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                if !s.is_empty() {
+                    eprintln!("Some jobs were still running when program aborted: {}", s);
+                }
                 return;
             }
             job_finish = recv.recv() => {

@@ -2,9 +2,6 @@ use std::collections::HashMap;
 use rnotifydlib::config::JobDefinitionId;
 use crate::next_run::ProvisionalJobRuns;
 
-const EMPTY_VEC: Vec<u64> = vec![];
-const EMPTY_VEC_REF: &Vec<u64> = &EMPTY_VEC;
-
 pub struct RunningJobs {
     map: HashMap<JobDefinitionId, Vec<u64>>,
 }
@@ -36,8 +33,8 @@ impl RunningJobs {
             .is_some()
     }
 
-    pub fn get_running(&self, id: &JobDefinitionId) -> &Vec<u64> {
-        self.map.get(id).unwrap_or(EMPTY_VEC_REF)
+    pub fn get_running(&self) -> &HashMap<JobDefinitionId, Vec<u64>> {
+        &self.map
     }
 }
 
