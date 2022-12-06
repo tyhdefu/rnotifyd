@@ -59,9 +59,6 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: &Runtime) {
     let _guard = rt.enter();
 
     println!("Beginning main loop.");
-    let mut interval = tokio::time::interval(CHECK_INTERVAL);
-    interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
-
     let job_config = config.get_job_config().clone();
     let mut next_run = NextRun::new();
 
