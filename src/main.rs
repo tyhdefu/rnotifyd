@@ -26,7 +26,8 @@ mod all_config;
 mod next_run;
 mod running_jobs;
 
-fn main() {
+#[tokio::main(worker_threads = 1)]
+async fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
         .build()
@@ -47,10 +48,13 @@ fn main() {
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
     let handle = runtime.handle().clone();
-    handle.spawn(main_loop(configs, run_log, runtime));
+
+    main_loop(configs, run_log, runtime).await
 }
 
 async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: Runtime) {
+    let guard = rt.enter();
+
     println!("Beginning main loop.");
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
