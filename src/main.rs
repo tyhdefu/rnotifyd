@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use chrono::{Local, SecondsFormat};
 use getopts::Options;
+use tokio::runtime::Runtime;
 use tokio::sync::mpsc::Sender;
 use tokio::time::MissedTickBehavior;
 use all_config::AllConfig;
@@ -25,8 +26,12 @@ mod all_config;
 mod next_run;
 mod running_jobs;
 
-#[tokio::main(worker_threads = 3)]
-async fn main() {
+fn main() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(3)
+        .build()
+        .unwrap();
+
     println!("-- Started at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
@@ -41,10 +46,10 @@ async fn main() {
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
-    main_loop(configs, run_log).await;
+    tokio::spawn(main_loop(configs, run_log, runtime));
 }
 
-async fn main_loop(config: AllConfig, mut run_log: RunLog) {
+async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: Runtime) {
     println!("Beginning main loop.");
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
     interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -98,7 +103,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 if !s.is_empty() {
                     eprintln!("Some jobs were still running when program aborted: {}", s);
                 }
-                tokio::runtime::Runtime::shutdown_timeout(Duration::from_millis(500));
+                rt.shutdown_timeout(Duration::from_millis(500));
                 return;
             }
             job_finish = recv.recv() => {
