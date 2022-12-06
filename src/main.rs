@@ -26,8 +26,7 @@ mod all_config;
 mod next_run;
 mod running_jobs;
 
-#[tokio::main(worker_threads = 1)]
-async fn main() {
+fn main() {
     let mut runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
         .enable_time()
@@ -49,7 +48,8 @@ async fn main() {
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
-    main_loop(configs, run_log, &runtime).await;
+
+    futures::executor::block_on(main_loop(configs, run_log, &runtime));
     runtime.shutdown_timeout(Duration::from_millis(250));
     println!("-- Stopped at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true))
 }

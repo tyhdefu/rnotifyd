@@ -19,6 +19,7 @@ serde_yaml = "0.9.14"
 toml = "0.5.9"
 rnotify = { git = "https://github.com/tyhdefu/rnotify.git" }
 getopts = "0.2.21"
+futures = { version = "0.3.25", default-features = false, features = ["executor"]}
 
 tokio = { version = "1.21.0", features = ["macros", "time", "rt-multi-thread", "signal", "net", "sync"] }
 chrono = { version = "0.4.22", features = ["serde"] }
