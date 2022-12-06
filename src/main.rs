@@ -27,7 +27,7 @@ mod running_jobs;
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
-    println!("Started at: {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
+    println!("-- Started at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
     opts.reqopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.yaml file.", "RNOTIFYD");
@@ -42,7 +42,6 @@ async fn main() {
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
     main_loop(configs, run_log).await;
-    println!("Done.");
 }
 
 async fn main_loop(config: AllConfig, mut run_log: RunLog) {
@@ -73,11 +72,11 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 
                 running.add(id.clone(), timestamp_now);
                 next_run.invalidate(id);
+                next_run.update_and_get(id, definition.get_frequency(), now + chrono::Duration::seconds(1), &run_log, &running);
+
                 // Run task.
                 spawn_job(id.clone(), definition.get_cmd().clone(), definition.get_notify_definition().clone(),
                           config.get_rnotify_config().clone(), timestamp_now, send.clone());
-
-                next_run.update_and_get(id, definition.get_frequency(), now + chrono::Duration::seconds(1), &run_log, &running);
             }
         }
 
