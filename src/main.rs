@@ -26,7 +26,7 @@ mod all_config;
 async fn main() {
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
-    opts.reqopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.json file.", "RNOTIFYD");
+    opts.reqopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.yaml file.", "RNOTIFYD");
     opts.optopt("", RNOTIFY_RUN_LOG_ARG, "The run log file.", "RUNLOG");
     let args: Vec<_> = std::env::args().collect();
     let parsed = match opts.parse(args) {
@@ -109,7 +109,8 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 println!("Job finished: {:?}", job_finish);
                 running.remove(&job_finish.id);
 
-                run_log.record(job_finish.id, timestamp_now); // TODO: Write to file?
+                run_log.record(job_finish.id, job_finish.started);
+                spawn_runlog_write(run_log.write_to_string(), config.get_run_log_path().clone());
             }
         );
     }
@@ -130,6 +131,19 @@ impl JobFinish {
             success,
         }
     }
+}
+
+fn spawn_runlog_write(s: String, loc: PathBuf) {
+    tokio::spawn(async move {
+        match std::fs::write(loc, s) {
+            Ok(_) => {
+                println!("Wrote run log.");
+            }
+            Err(err) => {
+                eprintln!("Error writing run log: {err}");
+            }
+        }
+    });
 }
 
 fn spawn_job(id: JobDefinitionId, cmd: String, notify_definition: NotifyDefinition,
