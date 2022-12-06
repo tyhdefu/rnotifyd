@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use rnotifydlib::config::JobDefinitionId;
 
+#[derive(Debug)]
 pub struct RunLog {
     last_run: HashMap<JobDefinitionId, u64>,
 }

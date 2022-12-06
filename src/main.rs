@@ -29,6 +29,7 @@ mod running_jobs;
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
+    println!("Started at: {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
     opts.reqopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.yaml file.", "RNOTIFYD");
@@ -41,6 +42,7 @@ async fn main() {
     let configs = all_config::read_configs(&parsed);
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
+    println!("RunLog: {:?}", run_log);
     main_loop(configs, run_log).await;
     println!("Done.");
 }
