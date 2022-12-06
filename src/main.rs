@@ -46,7 +46,8 @@ fn main() {
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
-    tokio::spawn(main_loop(configs, run_log, runtime));
+    let handle = runtime.handle().clone();
+    handle.spawn(main_loop(configs, run_log, runtime));
 }
 
 async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: Runtime) {
