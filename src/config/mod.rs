@@ -18,6 +18,8 @@ impl Config {
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct JobDefinition {
     cmd: String,
+    #[serde(default)] // false by default.
+    allow_parallel: bool,
     frequency: Frequency,
     #[serde(rename = "notification")]
     notify_definition: NotifyDefinition,
@@ -34,6 +36,10 @@ impl JobDefinition {
 
     pub fn get_notify_definition(&self) -> &NotifyDefinition {
         &self.notify_definition
+    }
+
+    pub fn allow_parallel(&self) -> bool {
+        self.allow_parallel
     }
 }
 
@@ -84,6 +90,7 @@ mod tests {
         let mut jobs = HashMap::new();
         let job = JobDefinition {
             cmd: "ping 192.168.0.10".to_string(),
+            allow_parallel: false,
             frequency: Frequency::FixedPeriod(FixedPeriodInner::new(0, 30, 0)),
             notify_definition: NotifyDefinition::new("Ping 192.168.0.10".to_string(), Component::from("ping"),
                                                      false, ProgramOutputFormat::StdoutIfSuccess),

@@ -55,7 +55,7 @@ fn run_program(job: &str) -> Result<ProgramOutput, Box<dyn Error>> {
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
-    let mut process = cmd.spawn()?;
+    let process = cmd.spawn()?;
 
     let output = process.wait_with_output()?;
 

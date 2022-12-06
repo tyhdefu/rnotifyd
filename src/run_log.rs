@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use rnotifydlib::config::JobDefinitionId;
 
 pub struct RunLog {
@@ -6,11 +8,11 @@ pub struct RunLog {
 }
 
 impl RunLog {
-    pub fn get_last_run(&self, id: &JobDefinitionId) -> Option<u64> {
+    pub fn get_last_successful_run_time(&self, id: &JobDefinitionId) -> Option<u64> {
         self.last_run.get(id).copied()
     }
 
-    pub fn insert(&mut self, id: JobDefinitionId, timestamp: u64){
+    pub fn record(&mut self, id: JobDefinitionId, timestamp: u64){
         self.last_run.insert(id, timestamp);
     }
 
@@ -49,4 +51,19 @@ impl Default for RunLog {
             last_run: HashMap::new(),
         }
     }
+}
+
+pub fn read_run_log(path: &PathBuf) -> RunLog {
+    if !path.exists() {
+        eprintln!("Cannot find run log file, assuming nothing has run.");
+        return RunLog::default();
+    }
+    let run_log_str = fs::read_to_string(path).expect("Failed to read run log"); // TODO: Check if exists etc.
+
+    RunLog::read_from_string(&run_log_str).expect("Failed to parse run log.")
+}
+
+pub fn write_run_log(run_log: &RunLog, path: &PathBuf) -> std::io::Result<()> {
+    let s = run_log.write_to_string();
+    fs::write(path, s)
 }
