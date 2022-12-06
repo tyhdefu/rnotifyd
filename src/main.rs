@@ -88,7 +88,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
 
             }
             _ = tokio::signal::ctrl_c() => {
-                eprintln!("Received control-c");
+                eprintln!("Terminating");
                 let s: String = running.get_running().iter()
                     .filter(|(_a, b)| !b.is_empty())
                     .map(|(a, b)| format!("{a} x{}", b.len()))
@@ -98,6 +98,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 if !s.is_empty() {
                     eprintln!("Some jobs were still running when program aborted: {}", s);
                 }
+                tokio::runtime::Runtime::shutdown_timeout(Duration::from_millis(500));
                 return;
             }
             job_finish = recv.recv() => {
