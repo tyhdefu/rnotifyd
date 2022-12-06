@@ -30,6 +30,7 @@ mod running_jobs;
 async fn main() {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
+        .enable_time()
         .build()
         .unwrap();
 
