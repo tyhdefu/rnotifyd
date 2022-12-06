@@ -7,11 +7,14 @@ use getopts::Options;
 use tokio::sync::mpsc::Sender;
 use tokio::time::MissedTickBehavior;
 use all_config::AllConfig;
+use next_run::NextRun;
 use rnotifydlib::action;
 use rnotifydlib::config::{JobDefinition, JobDefinitionId};
+use rnotifydlib::frequency::Frequency;
 use rnotifydlib::job_result::JobResult;
 use rnotifydlib::notify_definition::NotifyDefinition;
 use crate::run_log::RunLog;
+use crate::running_jobs::RunningJobs;
 
 const RNOTIFY_CONFIG_ARG: &str = "rnotify-config";
 const RNOTIFYD_CONFIG_ARG: &str = "config";
@@ -21,6 +24,8 @@ const CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
 mod run_log;
 mod all_config;
+mod next_run;
+mod running_jobs;
 
 #[tokio::main(worker_threads = 3)]
 async fn main() {
@@ -46,23 +51,11 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
     interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
 
     let job_config = config.get_job_config().clone();
-    let mut next_run = HashMap::new();
-
-    fn update_next_run(next_run: &mut HashMap<JobDefinitionId, u64>, now: DateTime<Local>,
-                       id: &JobDefinitionId, definition: &JobDefinition,
-                       run_log: &RunLog) -> u64 {
-        *next_run.entry(id.clone()).or_insert_with(|| {
-            let timestamp_now = now.timestamp() as u64;
-
-            let last_run = run_log.get_last_successful_run_time(id);
-            let next = definition.get_frequency().next(&now, last_run);
-            //println!("Next {}, now: {}, diff: {}", next, timestamp_now, next - timestamp_now);
-            next
-        })
-    }
+    let mut next_run = NextRun::new();
 
     // Currently running non-parallel allowed jobs
-    let mut running: HashSet<JobDefinitionId> = HashSet::new();
+    let mut running = RunningJobs::new();
+
     // Sender to report when jobs finish.
     let (send, mut recv) = tokio::sync::mpsc::channel(10);
 
@@ -70,27 +63,26 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
         let now = Local::now();
         let timestamp_now = now.timestamp() as u64;
         for (id, definition) in job_config.entries() {
-            let next = update_next_run(&mut next_run, now, id, definition, &run_log);
+            let next = next_run.update_and_get(id, definition.get_frequency(), now, &run_log, &running);
             if timestamp_now >= next {
-                if !definition.allow_parallel() && running.contains(&id) {
+                if !definition.allow_parallel() && running.any_running(&id) {
                     println!("Job {} is due to run, but is already running, so it will not be run yet.", id);
                     continue;
                 }
                 println!("Job {} is due to run.", id);
-                next_run.remove(id);
+
+                running.add(id.clone(), timestamp_now);
+                next_run.invalidate(id);
                 // Run task.
                 spawn_job(id.clone(), definition.get_cmd().clone(), definition.get_notify_definition().clone(),
-                          config.get_rnotify_config().clone(), send.clone());
+                          config.get_rnotify_config().clone(), timestamp_now, send.clone());
 
-                update_next_run(&mut next_run, now + chrono::Duration::seconds(1), id, definition, &run_log);
+                next_run.update_and_get(id, definition.get_frequency(), now + chrono::Duration::seconds(1), &run_log, &running);
             }
         }
-        let short_wait = next_run.values()
-            .map(|i| i - timestamp_now).min()
-            .unwrap_or(u64::MAX);
 
-        let short_wait_duration = Duration::from_secs(short_wait);
-        let sleep = min(short_wait_duration, CHECK_INTERVAL);
+        let short_wait = next_run.get_wait(timestamp_now);
+        let sleep = min(short_wait, CHECK_INTERVAL);
 
         tokio::select!(
             _ = tokio::time::sleep(sleep) => {
@@ -107,7 +99,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 }
                 let job_finish = job_finish.unwrap();
                 println!("Job finished: {:?}", job_finish);
-                running.remove(&job_finish.id);
+                running.mark_completed(&job_finish.id, job_finish.started);
 
                 run_log.record(job_finish.id, job_finish.started);
                 spawn_runlog_write(run_log.write_to_string(), config.get_run_log_path().clone());
@@ -147,13 +139,12 @@ fn spawn_runlog_write(s: String, loc: PathBuf) {
 }
 
 fn spawn_job(id: JobDefinitionId, cmd: String, notify_definition: NotifyDefinition,
-             rnotify_config: rnotifylib::config::Config, job_finish_sender: Sender<JobFinish>) {
-    tokio::task::spawn(run_job(id, cmd, notify_definition, rnotify_config, job_finish_sender));
+             rnotify_config: rnotifylib::config::Config, start_timestamp: u64, job_finish_sender: Sender<JobFinish>) {
+    tokio::task::spawn(run_job(id, cmd, notify_definition, rnotify_config, start_timestamp, job_finish_sender));
 }
 
 async fn run_job(id: JobDefinitionId, cmd: String, notify_definition: NotifyDefinition,
-                 rnotify_config: rnotifylib::config::Config, job_finish_sender: Sender<JobFinish>) {
-    let start_timestamp = Local::now().timestamp() as u64;
+                 rnotify_config: rnotifylib::config::Config, start_timestamp: u64, job_finish_sender: Sender<JobFinish>) {
     println!("[{id}] Running at {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     let output = action::execute(&cmd, notify_definition.get_output_format()).await;
     if let JobResult::Invalid(err) = &output {
