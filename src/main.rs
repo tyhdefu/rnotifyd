@@ -62,7 +62,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
     }
 
     // Currently running non-parallel allowed jobs
-    let running: HashSet<JobDefinitionId> = HashSet::new();
+    let mut running: HashSet<JobDefinitionId> = HashSet::new();
     // Sender to report when jobs finish.
     let (send, mut recv) = tokio::sync::mpsc::channel(10);
 
@@ -101,10 +101,15 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog) {
                 return;
             }
             job_finish = recv.recv() => {
+                if job_finish.is_none() {
+                    eprintln!("Job finish receiver had the other end dropped");
+                    return;
+                }
+                let job_finish = job_finish.unwrap();
                 println!("Job finished: {:?}", job_finish);
-                running.remove(job_finish.id);
+                running.remove(&job_finish.id);
 
-                run_log.record(id, timestamp_now); // TODO: Write to file?
+                run_log.record(job_finish.id, timestamp_now); // TODO: Write to file?
             }
         );
     }
