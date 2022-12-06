@@ -64,11 +64,6 @@ pub fn read_run_log(path: &PathBuf) -> RunLog {
     RunLog::read_from_string(&run_log_str).expect("Failed to parse run log.")
 }
 
-pub fn write_run_log(run_log: &RunLog, path: &PathBuf) -> std::io::Result<()> {
-    let s = run_log.write_to_string();
-    fs::write(path, s)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

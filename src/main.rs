@@ -28,7 +28,7 @@ mod running_jobs;
 
 #[tokio::main(worker_threads = 1)]
 async fn main() {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
+    let mut runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
         .enable_time()
         .enable_io()
@@ -49,12 +49,14 @@ async fn main() {
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
     println!("RunLog: {:?}", run_log);
-    main_loop(configs, run_log, runtime).await;
+    main_loop(configs, run_log, &runtime).await;
+    runtime.shutdown_timeout(Duration::from_millis(250));
     println!("-- Stopped at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true))
 }
 
-async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: Runtime) {
-    let guard = rt.enter();
+async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: &Runtime) {
+    // Make the current tokio runtime, be this runtime.
+    let _guard = rt.enter();
 
     println!("Beginning main loop.");
     let mut interval = tokio::time::interval(CHECK_INTERVAL);
@@ -107,9 +109,8 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: Runtime) {
                     .join(", ");
 
                 if !s.is_empty() {
-                    eprintln!("Some jobs were still running when program aborted: {}", s);
+                    eprintln!("Warning some jobs are still running: {}", s);
                 }
-                rt.shutdown_timeout(Duration::from_millis(500));
                 return;
             }
             job_finish = recv.recv() => {
