@@ -11,6 +11,12 @@ pub enum ProgramOutputFormat {
     SimpleIfSuccess,
     StdoutIfSuccess,
     AlwaysDetailed,
+    /// Converts a program's output into a list of failures / successes.
+    /// The program must conform its output to the expected format:
+    ///     component1:success
+    ///     component2:failure:reason for failure
+    ///     component3:success
+    List,
 }
 
 impl Default for ProgramOutputFormat {

@@ -3,6 +3,8 @@ use rnotifylib::message::message_detail_builder::MessageDetailBuilder;
 use rnotifylib::message::MessageDetail;
 use crate::action::ProgramOutputFormat;
 
+mod list_output;
+
 #[derive(Debug)]
 pub struct ProgramOutput {
     std_out: String,
@@ -74,6 +76,7 @@ impl ProgramOutput {
             },
             (ProgramOutputFormat::StdoutIfSuccess, false) => to_detail_verbose(&self),
             (ProgramOutputFormat::AlwaysDetailed, _) => to_detail_verbose(&self),
+            (ProgramOutputFormat::List, _) => list_output::to_detail_from_list(&self),
         }
     }
 }
