@@ -66,7 +66,7 @@ fn run_program(job: &str) -> Result<ProgramOutput, Box<dyn Error>> {
     let output = process.wait_with_output()?;
 
     let std_out = String::from_utf8_lossy(&output.stdout);
-    let std_err = String::from_utf8_lossy(&output.stdout);
+    let std_err = String::from_utf8_lossy(&output.stderr);
 
     Ok(ProgramOutput::new(std_out.into(), std_err.into(), output.status.code().unwrap_or(-1)))
 }
