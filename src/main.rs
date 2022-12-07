@@ -5,7 +5,6 @@ use chrono::{Local, SecondsFormat};
 use getopts::Options;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::Sender;
-use tokio::time::MissedTickBehavior;
 use all_config::AllConfig;
 use next_run::NextRun;
 use rnotifydlib::action;
@@ -27,7 +26,7 @@ mod next_run;
 mod running_jobs;
 
 fn main() {
-    let mut runtime = tokio::runtime::Builder::new_multi_thread()
+    let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
         .enable_time()
         .enable_io()
