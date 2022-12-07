@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use log::warn;
 use rnotifydlib::config::JobDefinitionId;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -56,7 +57,7 @@ impl Default for RunLog {
 
 pub fn read_run_log(path: &PathBuf) -> RunLog {
     if !path.exists() {
-        eprintln!("Cannot find run log file, assuming nothing has run.");
+        warn!("Cannot find run log file, assuming nothing has run.");
         return RunLog::default();
     }
     let run_log_str = fs::read_to_string(path).expect("Failed to read run log"); // TODO: Check if exists etc.

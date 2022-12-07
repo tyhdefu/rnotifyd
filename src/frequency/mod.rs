@@ -1,4 +1,5 @@
 use chrono::{Datelike, DateTime, Duration, Local, Month, Months, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Weekday};
+use log::error;
 use serde::{Deserialize, Serialize};
 use num_traits::cast::FromPrimitive;
 
@@ -37,12 +38,12 @@ impl Frequency {
                     }
                     cur += Duration::days(1)
                 }
-                eprintln!("Couldn't find any suitable time within 100 days. {:?}", &self);
+                error!("Couldn't find any suitable time within 100 days. {:?}", &self);
                 return u64::MAX
             },
             Frequency::Weekly { days, time } => {
                 if days.is_empty() {
-                    eprintln!("No days in {:?}", &self);
+                    error!("No days in {:?}", &self);
                     return u64::MAX;
                 }
                 let mut cur = now.clone();
@@ -57,7 +58,7 @@ impl Frequency {
                     }
                     cur += Duration::days(1)
                 }
-                eprintln!("Couldn't find any suitable day/time within 300 days. {:?}", &self);
+                error!("Couldn't find any suitable day/time within 300 days. {:?}", &self);
                 return u64::MAX
             },
             Frequency::Monthly { day, time } => {
@@ -76,12 +77,12 @@ impl Frequency {
                     }
                     cur += Duration::days(1)
                 }
-                eprintln!("Couldn't find any suitable day/time within 100 days. {:?}. Reached date {:?}.", &self, cur);
+                error!("Couldn't find any suitable day/time within 100 days. {:?}. Reached date {:?}.", &self, cur);
                 return u64::MAX;
             }
             Frequency::Yearly { months, day, time } => {
                 if months.is_empty() {
-                    eprintln!("No months in {:?}", &self);
+                    error!("No months in {:?}", &self);
                     return u64::MAX;
                 }
                 let mut naive_date = now.date_naive();
@@ -118,7 +119,7 @@ impl Frequency {
                         continue;
                     }
                 }
-                eprintln!("Couldn't find any suitable day/time within 300 tries. {:?}. Reached date {:?}.", &self, naive_date);
+                error!("Couldn't find any suitable day/time within 300 tries. {:?}. Reached date {:?}.", &self, naive_date);
                 return u64::MAX
             },
         }

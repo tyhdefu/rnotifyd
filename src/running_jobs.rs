@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use log::error;
 use rnotifydlib::config::JobDefinitionId;
 use crate::next_run::ProvisionalJobRuns;
 
@@ -20,7 +21,7 @@ impl RunningJobs {
 
     pub fn mark_completed(&mut self, id: &JobDefinitionId, started: u64) {
         match self.map.get_mut(id) {
-            None => eprintln!("No job to mark completed."),
+            None => error!("No job to mark completed."),
             Some(vec) => {
                 vec.retain(|i| *i != started);
             }

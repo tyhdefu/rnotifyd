@@ -2,7 +2,9 @@ use std::cmp::min;
 use std::path::PathBuf;
 use std::time::Duration;
 use chrono::{Local, SecondsFormat};
+use env_logger::Env;
 use getopts::Options;
+use log::{debug, error, info, warn};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::Sender;
 use all_config::AllConfig;
@@ -26,6 +28,8 @@ mod next_run;
 mod running_jobs;
 
 fn main() {
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(3)
         .enable_time()
@@ -33,7 +37,7 @@ fn main() {
         .build()
         .unwrap();
 
-    println!("-- Started at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
+    info!("-- Started at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     let mut opts = Options::new();
     opts.optopt("", RNOTIFY_CONFIG_ARG, "The rnotify.toml file.", "RNOTIFY");
     opts.reqopt("", RNOTIFYD_CONFIG_ARG, "The rnotifyd.yaml file.", "RNOTIFYD");
@@ -46,18 +50,18 @@ fn main() {
     let configs = all_config::read_configs(&parsed);
 
     let run_log = run_log::read_run_log(&configs.get_run_log_path());
-    println!("RunLog: {:?}", run_log);
+    debug!("RunLog: {:?}", run_log);
 
     futures::executor::block_on(main_loop(configs, run_log, &runtime));
     runtime.shutdown_timeout(Duration::from_millis(250));
-    println!("-- Stopped at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true))
+    info!("-- Stopped at: {} --", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true))
 }
 
 async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: &Runtime) {
     // Make the current tokio runtime, be this runtime.
     let _guard = rt.enter();
 
-    println!("Beginning main loop.");
+    debug!("Beginning main loop.");
     let job_config = config.get_job_config().clone();
     let mut next_run = NextRun::new();
 
@@ -74,10 +78,10 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: &Runtime) {
             let next = next_run.update_and_get(id, definition.get_frequency(), now, &run_log, &running);
             if timestamp_now >= next {
                 if !definition.allow_parallel() && running.any_running(&id) {
-                    println!("Job {} is due to run, but is already running, so it will not be run yet.", id);
+                    debug!("Job {} is due to run, but is already running, so it will not be run yet.", id);
                     continue;
                 }
-                println!("Job {} is due to run.", id);
+                debug!("Job {} is due to run.", id);
 
                 running.add(id.clone(), timestamp_now);
                 next_run.invalidate(id);
@@ -97,7 +101,7 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: &Runtime) {
 
             }
             _ = tokio::signal::ctrl_c() => {
-                eprintln!("Terminating");
+                info!("Terminating");
                 let s: String = running.get_running().iter()
                     .filter(|(_a, b)| !b.is_empty())
                     .map(|(a, b)| format!("{a} x{}", b.len()))
@@ -105,17 +109,17 @@ async fn main_loop(config: AllConfig, mut run_log: RunLog, rt: &Runtime) {
                     .join(", ");
 
                 if !s.is_empty() {
-                    eprintln!("Warning some jobs are still running: {}", s);
+                    warn!("Some jobs are still running: {}", s);
                 }
                 return;
             }
             job_finish = recv.recv() => {
                 if job_finish.is_none() {
-                    eprintln!("Job finish receiver had the other end dropped");
+                    error!("Job finish receiver had the other end dropped");
                     return;
                 }
                 let job_finish = job_finish.unwrap();
-                println!("Job finished: {:?}", job_finish);
+                debug!("Job finished: {:?}", job_finish);
                 running.mark_completed(&job_finish.id, job_finish.started);
 
                 run_log.record(job_finish.id, job_finish.started);
@@ -146,10 +150,10 @@ fn spawn_runlog_write(s: String, loc: PathBuf) {
     tokio::spawn(async move {
         match std::fs::write(loc, s) {
             Ok(_) => {
-                println!("Wrote run log.");
+                debug!("Wrote run log.");
             }
             Err(err) => {
-                eprintln!("Error writing run log: {err}");
+                error!("Error writing run log: {err}");
             }
         }
     });
@@ -162,27 +166,27 @@ fn spawn_job(id: JobDefinitionId, cmd: String, notify_definition: NotifyDefiniti
 
 async fn run_job(id: JobDefinitionId, cmd: String, notify_definition: NotifyDefinition,
                  rnotify_config: rnotifylib::config::Config, start_timestamp: u64, job_finish_sender: Sender<JobFinish>) {
-    println!("[{id}] Running at {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
+    info!("[{id}] Running at {}", Local::now().to_rfc3339_opts(SecondsFormat::Millis, true));
     let output = action::execute(&cmd, notify_definition.get_output_format()).await;
     if let JobResult::Invalid(err) = &output {
-        eprintln!("[{id}] Failed to run job: {:?}", err);
+        error!("[{id}] Failed to run job: {:?}", err);
     }
     let succ = matches!(&output, JobResult::Ok(_));
     let job_finish = JobFinish::new(id.clone(), start_timestamp, succ);
 
-    println!("[{id}] Job had outcome {}", output.type_str());
+    info!("[{id}] Job had outcome {}", output.type_str());
     match notify_definition.create_message(&id, output) {
-        None => println!("[{id}] Didn't need a rnotify message to be sent"),
+        None => info!("[{id}] Didn't need a rnotify message to be sent"),
         Some(message) => {
             match rnotifylib::send_message(message, &rnotify_config) {
-                Ok(()) => println!("[{id}] Sent a message to rnotify."),
-                Err(errs) => println!("[{id}] Failed to send a message to rnotify {}", errs),
+                Ok(()) => info!("[{id}] Sent a message to rnotify."),
+                Err(errs) => error!("[{id}] Failed to send a message to rnotify {}", errs),
             }
         }
     }
 
     if let Err(e) = job_finish_sender.send(job_finish).await {
-        eprintln!("Failed to record job finishing: {}", e);
+        error!("Failed to record job finishing: {}", e);
     }
 
 }
