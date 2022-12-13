@@ -41,28 +41,28 @@ pub fn to_detail_from_list(output: &ProgramOutput) -> MessageDetail {
 
     builder = builder.section("Failed components", |s| {
         if failed_components.is_empty() {
-            s.append(FormattedString::plain("None"));
+            s.append_plain("None");
         }
         for (i, (failure, reason)) in failed_components.iter().enumerate() {
             if i != 0 {
-                s.append(FormattedString::plain("\n"));
+                s.append_plain("\n");
             }
 
-            s.append(FormattedString::plain(format!("- {} ", failure)));
+            s.append_plain(format!("- {} ", failure));
             s.append_styled(reason, Style::Monospace);
         }
     });
 
     builder = builder.section("Successful components", |s| {
         if successful_components.is_empty() {
-            s.append(FormattedString::plain("None"));
+            s.append_plain("None");
         }
         for (i, success) in successful_components.iter().enumerate() {
             if i != 0 {
-                s.append(FormattedString::plain("\n"));
+                s.append_plain("\n");
             }
 
-            s.append(FormattedString::plain(format!("- {}", success)));
+            s.append_plain(format!("- {}", success));
         }
     });
 
