@@ -549,7 +549,7 @@ dependencies = [
 [[package]]
 name = "rnotify"
 version = "0.1.2"
-source = "git+https://github.com/tyhdefu/rnotify.git#121cca6db87a62434935f6df48192bf0402cbf55"
+source = "git+https://github.com/tyhdefu/rnotify.git#534dc696f94eae87af517f3716afeb07a41ebcd4"
 dependencies = [
  "chrono",
  "discord-webhook",
